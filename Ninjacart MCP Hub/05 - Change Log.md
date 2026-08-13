@@ -4,6 +4,22 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-13 — Google Cloud Console set up, first real end-to-end login test, 3 bugs found & fixed
+
+- **Google Cloud Console**: OAuth consent screen + Web application OAuth client created (user did this manually — needs their own console access). `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` added to the local, gitignored `.env`. Redirect URI registered: `http://localhost:3000/oauth/callback` (Railway domain callback still to be added post-deploy).
+- **First real login test**, port 3000 (had to temporarily stop the PackTrack Pro PM2 process, which owns that port locally — restarted it after; production on Railway was never affected). Ran the full flow live: DCR `/register` → `/authorize` → real Google sign-in as `aranyanandi@ninjacart.com` → domain + role check passed → broker code → `/token` exchange (PKCE verified, including a deliberate mismatch test that correctly failed) → authenticated `POST /mcp` → `initialize` → `tools/list` → `tools/call query_packtrack_db`.
+- **3 bugs found and fixed this way** (commit `3992cce`):
+  1. `embed.js` built its OpenAI client at import time — an unset `EMBEDDING_API_KEY` crashed the *entire* server on boot, not just the knowledge tool. Made lazy.
+  2. `jwt.js` signed `aud` as the bare public origin, but `tokenVerifier.js`'s `checkResourceAllowed` check compares against the `/mcp` resource path specifically — every token failed resource validation as a result. Fixed `aud` to include `/mcp`.
+  3. `tokenVerifier.js` threw plain `Error` on invalid/expired tokens. `requireBearerAuth` only recognizes the SDK's own `OAuthError` subclasses, so an unrecognized error type silently became an opaque 500 instead of the "self-explanatory" 401 the plan called for. Switched to `InvalidTokenError`.
+- **Verified live against the real Postgres role**: `SELECT count(*) FROM materials` → 44 (correct), `DELETE FROM materials...` → rejected before any DB round-trip, `SELECT * FROM users` → `permission denied for table users` (proves the `REVOKE` in migration 024 holds independently of the app-side guard).
+
+**Why:** These are exactly the kind of bugs that only surface under a real OAuth round-trip — the earlier smoke test (dummy env, no real Google flow) couldn't have caught the `aud` mismatch or the error-class issue, since both only trigger once a genuinely valid or genuinely invalid *real* token exists.
+
+**Next:** Railway deployment (steps 20–23 of the build plan) — needs the user's Railway access to create the project and set env vars, then adding the Railway domain as a second Google OAuth redirect URI, then the verification checklist against the live deployment.
+
+---
+
 ## 2026-08-13 — Core implementation: auth, MCP server, PackTrack tools
 
 Implemented steps 3–18 of the build plan.

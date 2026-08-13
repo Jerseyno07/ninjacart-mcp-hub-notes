@@ -28,6 +28,8 @@ PORT=3000
 ```
 
 ## Google Cloud Console setup (manual)
+**Done 2026-08-13** — project + consent screen + Web application OAuth client created by the user (needs their own console access, not something done from this session). `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are in the local, gitignored `.env`. Still to do: add the Railway domain's `/oauth/callback` as a second authorized redirect URI once deployed (see step below).
+
 1. console.cloud.google.com → select/create a project.
 2. **OAuth consent screen**: User Type = **Internal** if org admin rights exist on the Cloud project (extra layer beyond the app's own `hd`/domain check). Otherwise External + rely on the app-level check.
 3. **Credentials → Create OAuth client ID** → Web application, name "Ninjacart MCP Hub". Authorized redirect URIs: `https://<railway-domain>/oauth/callback` + `http://localhost:3000/oauth/callback` for local testing.
