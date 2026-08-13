@@ -13,7 +13,7 @@
 6. `schema-context.md` (adapted `docs/db-schema.md` + gotchas below) injected into the tool description for grounding.
 
 ## The read-only Postgres role — lives in `packtrack-pro`, not this repo
-Migration `packtrack-pro/db/024_mcp_readonly_role.sql` (verify `024` still free at execution time — more migrations may have landed since this plan was written):
+**Applied 2026-08-13** — `mcp_readonly` role created and verified (`has_table_privilege('mcp_readonly','materials','SELECT')` → true, same check on `users` → false). Migration `packtrack-pro/db/024_mcp_readonly_role.sql`, commit `1033aad`:
 ```sql
 CREATE ROLE mcp_readonly WITH LOGIN PASSWORD '<generate strong random password>';
 GRANT CONNECT ON DATABASE <db> TO mcp_readonly;
@@ -31,7 +31,9 @@ ALTER ROLE mcp_readonly SET statement_timeout = '10s';
 
 ## `search_packtrack_knowledge` — knowledge base
 - Same Neon Postgres, `pgvector` extension (`CREATE EXTENSION IF NOT EXISTS vector;`) — no second database.
-- `knowledge_chunks` table: `id, project, source_file, heading, content, embedding vector(N), updated_at`.
+- `knowledge_chunks` table: `id, project, source_file, heading, content, embedding vector(1536), updated_at` — `store.js`'s `ensureSchema()` creates both on first ingest run.
+- **`KNOWLEDGE_DATABASE_URL` uses the full `packtrack-pro` owner connection string, not `mcp_readonly`** — decided during implementation. `mcp_readonly` is intentionally SELECT-only (that's the whole point of the query-tool defense-in-depth), but ingestion needs `CREATE TABLE`/`INSERT` into `knowledge_chunks`. Reusing the strictly-read-only role for that would either require weakening it (defeating its purpose) or granting narrow extra privileges on just one table — for a single-owner setup, using the existing owner credentials for this one write path was simpler and is what's in the local `.env`. Revisit with a dedicated `mcp_knowledge` role if this ever needs tighter separation.
+- Embedding provider: **OpenAI `text-embedding-3-small`** (1536 dims) — picked over Voyage AI as "the simpler fallback" per the original plan's own wording, avoiding a new vendor account for a single-owner tool. `src/knowledge/embed.js` isolates this choice to one file.
 - Ingestion (`src/knowledge/ingest.js --project packtrack`): walk `notes/*.md`, header-aware chunk, embed, upsert. **Manual, not automatic** — re-run whenever `notes/` changes. Staleness risk tracked in [[07 - Open Risks]].
 - Query time: embed query, cosine similarity (`<=>`) filtered `WHERE project = 'packtrack'`, top 6 chunks returned with `source_file`/`heading` metadata. Model should say plainly if nothing relevant comes back, not fall back to general knowledge.
 - Seed `notes/` content: PO upload validation rules, GRN flow, role model, indent→PO→GRN→issuance stage semantics — written fresh, not just a copy of `schema-context.md`.

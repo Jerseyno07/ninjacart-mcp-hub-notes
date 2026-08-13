@@ -10,7 +10,7 @@ ninjacart-mcp-hub/
 ├── src/
 │   ├── server.js                 # Express bootstrap: helmet, cors, auth routes,
 │   │                              # MCP metadata routes, requireBearerAuth-gated /mcp, /health
-│   ├── mcp/mcpServer.js          # The ONE shared McpServer instance every project registers onto
+│   ├── mcp/mcpServer.js          # createMcpServer() factory — see note below on why this isn't a singleton
 │   ├── auth/
 │   │   ├── googleOAuth.js        # OAuth2Client wrapper: buildAuthUrl / exchangeCodeForTokens / verifyIdTokenAndDomain
 │   │   ├── roles.js              # THE ONE FILE touched to grant/revoke a person's access
@@ -34,6 +34,11 @@ ninjacart-mcp-hub/
 │   └── util/logger.js
 └── public/                       # optional login/rejection page CSS
 ```
+
+## Why `mcpServer.js` is a factory, not a singleton (deviation from the original plan)
+The original plan called for "the ONE shared McpServer instance every project's tools register onto." Verifying against the actually-installed `@modelcontextprotocol/sdk` (as the plan's own Open Risks flagged to do) turned up a real constraint: `Protocol.connect(transport)` throws `"Already connected to a transport"` if called twice on the same instance — a `McpServer` can only ever be connected to one transport at a time. Since this server keeps one `StreamableHTTPServerTransport` per MCP session (matching the SDK's own reference example), a true singleton would break on the second concurrent client connection.
+
+Fix: `mcp/mcpServer.js` exports `createMcpServer()`, which builds a fresh `McpServer` and calls `registerAllProjects()` on it. `src/server.js` calls this factory once per new session (on the initialize request), not once at startup. Tool *registration* is still centralized through the one `registerAllProjects()` path in `registry.js` — adding a project is still a one-file change — only the *instantiation* moved from once-at-boot to once-per-session.
 
 ## Extensibility model
 Adding a **second project** later needs only: its own `index.js` exporting `register(mcpServer)`, its own DB/API client with its own credential env var, its own query-guard-equivalent, its own `schema-context.md`, its own `notes/` folder, and one new import line in `registry.js`. Nothing in `auth/`, `mcp/mcpServer.js`, `knowledge/`, or `server.js` changes to add a project — that's what keeps the core project-agnostic.
