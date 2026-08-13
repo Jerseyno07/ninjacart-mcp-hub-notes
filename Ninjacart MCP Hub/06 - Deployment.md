@@ -45,11 +45,10 @@ PORT=3000
 ## Deploy sequence (as actually run)
 1. ~~Run `packtrack-pro/db/024_mcp_readonly_role.sql` against Neon~~ — done earlier, see [[04 - PackTrack Integration]].
 2. ~~Set all env vars in Railway, deploy from GitHub~~ — done via Railway CLI.
-3. **Still to do**: `node src/knowledge/ingest.js --project packtrack` — not yet run; `EMBEDDING_API_KEY` isn't set on Railway yet, so `search_packtrack_knowledge` will error until both are done.
+3. ~~Run `node src/knowledge/ingest.js --project packtrack`~~ — done 2026-08-14 (17 chunks, 4 files), see [[05 - Change Log]].
 4. ~~Update redirect URI/public URL once the real domain exists~~ — done.
 
 ## Still open
-- Set `EMBEDDING_API_KEY` on Railway and run the knowledge ingestion CLI against production so `search_packtrack_knowledge` works live (currently only `query_packtrack_db` is usable).
 - Add the MCP server as a connector in Claude Desktop or claude.ai to confirm the full client-side experience (DCR → authorize → connected), not just raw HTTP calls.
 
 ## Related Notes

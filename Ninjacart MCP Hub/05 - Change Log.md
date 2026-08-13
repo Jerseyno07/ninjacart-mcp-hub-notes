@@ -4,6 +4,21 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-14 — Embeddings switched to Voyage AI, knowledge search live in production
+
+- **Discussed OpenAI vs Voyage AI** with the user: Voyage AI has a 200M-token one-time free grant (vs OpenAI's pay-from-token-one, though both are trivially cheap at this project's scale) and is generally rated better for retrieval — user chose Voyage.
+- **Swapped `embed.js`** from OpenAI's `text-embedding-3-small` (1536 dims) to Voyage's `voyage-4` (1024 dims, `EMBEDDING_DIMENSIONS` updated to match). Also now passes Voyage's `inputType` (`'document'` at ingest time, `'query'` at search time) — a retrieval-quality knob OpenAI's API doesn't expose, wired through `ingest.js` and `packtrack/index.js`. Removed the now-unused `openai` npm dependency.
+- **Real bug found while running actual ingestion** (not caught by reading docs): Voyage's free tier caps requests at 3/minute until a payment method is on file — a 4-file ingestion run hit a 429 partway through. Added retry-with-backoff in `embed.js` (up to 4 retries, ~21s apart) rather than requiring a manual re-run; confirmed the retry logic recovers automatically.
+- **Full ingestion run against the shared production Neon DB**: 17 chunks across all 4 notes files (`grn-flow.md`, `indent-issuance-flow.md`, `po-upload-validations.md`, `role-model.md`). Verified with a direct semantic-search sanity check (`"what validations exist on PO upload"` → correctly top-matched `po-upload-validations.md`).
+- **Pushed `EMBEDDING_API_KEY` to Railway, deployed the code swap** (commit `a08e4e6`) — the first redeploy attempt only picked up the new env var against the *old* OpenAI code (forgot to push the code changes first), caught by re-testing rather than assuming it worked. Second deploy had the real fix.
+- **Full live verification of `search_packtrack_knowledge` in production**: real Google login → token → `tools/call` → correct, well-ranked results returned (top hit: "Force Complete — one concept, three screens" for a force-complete/short-delivery question).
+
+**Why:** Closing out the one remaining gap from the Railway deployment — `search_packtrack_knowledge` was deployed but non-functional without an embedding key. Chose to actually run the real ingestion and a real production query rather than just deploying and assuming it works, which is what caught both the rate-limit issue and the forgot-to-push mistake.
+
+**Status: both `query_packtrack_db` and `search_packtrack_knowledge` are fully live and verified in production.** No remaining blockers from the original build plan — only the items already tracked in [[07 - Open Risks]].
+
+---
+
 ## 2026-08-13 — Deployed to Railway, live end-to-end verified
 
 - **Railway CLI installed and used for everything** (`npm install -g @railway/cli`) — project `ninjacart-mcp-hub` created under the `jerseyno07` workspace, service linked directly to the `Jerseyno07/ninjacart-mcp-hub` GitHub repo on `main` (auto-deploys on push, same pattern as PackTrack Pro), domain generated: `ninjacart-mcp-hub-production.up.railway.app`.
