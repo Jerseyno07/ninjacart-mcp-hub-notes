@@ -1,6 +1,10 @@
 # Deployment
 
-New, **separate** Railway project (not a service inside PackTrack Pro's), deployed from `ninjacart-mcp-hub`.
+**Live since 2026-08-13** — `https://ninjacart-mcp-hub-production.up.railway.app`, fully verified (real Google login → token → authenticated tool call, see [[05 - Change Log]]).
+
+New, **separate** Railway project (not a service inside PackTrack Pro's), deployed from `ninjacart-mcp-hub`. Railway CLI (`@railway/cli`, `npm install -g`) was used for the whole setup — project creation, service linked directly to the GitHub repo on `main` (auto-deploys on push, same as PackTrack Pro), env vars, and domain, all via `railway` commands rather than the dashboard.
+
+**Gotcha hit during setup**: the service domain must target the actual port the app binds to — Railway injects its own `PORT` value at container runtime (came out to 8080 here), not necessarily the port guessed when the domain was first created. If `/health` 502s right after a fresh domain, check `railway domain update --port <actual-port>`.
 
 ## `railway.toml`
 ```toml
@@ -28,7 +32,9 @@ PORT=3000
 ```
 
 ## Google Cloud Console setup (manual)
-**Done 2026-08-13** — project + consent screen + Web application OAuth client created by the user (needs their own console access, not something done from this session). `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are in the local, gitignored `.env`. Still to do: add the Railway domain's `/oauth/callback` as a second authorized redirect URI once deployed (see step below).
+**Done 2026-08-13** — project + consent screen + Web application OAuth client created by the user, plus the Railway domain's `/oauth/callback` added as a second Authorized redirect URI alongside localhost. `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set both in the local gitignored `.env` and as Railway service variables.
+
+**Gotcha**: adding a redirect URI in the console isn't instant — a first login attempt right after saving hit `redirect_uri_mismatch` even though the URI was correctly saved; it started working within a couple of minutes. If this happens, just wait and retry before assuming the config is wrong.
 
 1. console.cloud.google.com → select/create a project.
 2. **OAuth consent screen**: User Type = **Internal** if org admin rights exist on the Cloud project (extra layer beyond the app's own `hd`/domain check). Otherwise External + rely on the app-level check.
@@ -36,11 +42,15 @@ PORT=3000
 4. Copy Client ID/Secret into Railway env vars.
 5. Scopes: `openid email profile` — no extra console config needed.
 
-## Deploy sequence
-1. Run `packtrack-pro/db/024_mcp_readonly_role.sql` against Neon (via console if plain SQL role creation isn't available), enable `pgvector` if `knowledge_chunks` shares the DB.
-2. Set all env vars in Railway, deploy from GitHub.
-3. Run `node src/knowledge/ingest.js --project packtrack` once notes exist and the DB is reachable.
-4. If redirect URI/public URL weren't known before first deploy, update both Google Cloud Console and Railway env vars once the real domain exists, redeploy.
+## Deploy sequence (as actually run)
+1. ~~Run `packtrack-pro/db/024_mcp_readonly_role.sql` against Neon~~ — done earlier, see [[04 - PackTrack Integration]].
+2. ~~Set all env vars in Railway, deploy from GitHub~~ — done via Railway CLI.
+3. **Still to do**: `node src/knowledge/ingest.js --project packtrack` — not yet run; `EMBEDDING_API_KEY` isn't set on Railway yet, so `search_packtrack_knowledge` will error until both are done.
+4. ~~Update redirect URI/public URL once the real domain exists~~ — done.
+
+## Still open
+- Set `EMBEDDING_API_KEY` on Railway and run the knowledge ingestion CLI against production so `search_packtrack_knowledge` works live (currently only `query_packtrack_db` is usable).
+- Add the MCP server as a connector in Claude Desktop or claude.ai to confirm the full client-side experience (DCR → authorize → connected), not just raw HTTP calls.
 
 ## Related Notes
 - [[00 - Overview]]

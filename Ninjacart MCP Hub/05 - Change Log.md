@@ -4,6 +4,20 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-13 — Deployed to Railway, live end-to-end verified
+
+- **Railway CLI installed and used for everything** (`npm install -g @railway/cli`) — project `ninjacart-mcp-hub` created under the `jerseyno07` workspace, service linked directly to the `Jerseyno07/ninjacart-mcp-hub` GitHub repo on `main` (auto-deploys on push, same pattern as PackTrack Pro), domain generated: `ninjacart-mcp-hub-production.up.railway.app`.
+- **All env vars set via `railway variable set`** from the local `.env`, with `MCP_PUBLIC_URL`/`GOOGLE_OAUTH_REDIRECT_URI` correctly pointed at the real Railway domain (not localhost). `EMBEDDING_API_KEY` intentionally left unset for now — `query_packtrack_db` works without it; `search_packtrack_knowledge` will error until it's added.
+- **One deploy-time snag**: the domain was first created with `--port 3000` (a guess, before the container had actually started), but the app listens on whatever `PORT` Railway injects at runtime (came out to 8080) — caused a 502 until the domain's target port was corrected with `railway domain update --port 8080`. Domain→port binding is set once and should stay stable across redeploys.
+- **Google Console redirect URI**: user added `https://ninjacart-mcp-hub-production.up.railway.app/oauth/callback` as a second Authorized redirect URI (alongside the localhost one). First login attempt hit `redirect_uri_mismatch` — not a config error, just Google's normal propagation delay (roughly 1–2 minutes here); retried successfully once it cleared.
+- **Full live verification, exactly as done locally**: DCR `/register` → `/authorize` → real Google sign-in → domain+role check → token exchange → authenticated `POST /mcp` → `initialize` → `tools/call query_packtrack_db` (`SELECT count(*) FROM materials` → 44), all confirmed working against the actual production deployment, not just localhost.
+
+**Why:** Finishing the last steps of the build plan (20–23) — Railway deployment plus the post-deploy Google Console update — and re-verifying live rather than assuming the local smoke test generalizes, since the domain-port and redirect-URI issues above are exactly the kind of thing that only shows up once real infrastructure is involved.
+
+**Status: the Ninjacart MCP Hub is live and fully functional in production.** Remaining open items are all in [[07 - Open Risks]] (no refresh-token flow, in-memory tokenStore, no row-level scoping, etc.) — none block real use, all are known tradeoffs.
+
+---
+
 ## 2026-08-13 — Google Cloud Console set up, first real end-to-end login test, 3 bugs found & fixed
 
 - **Google Cloud Console**: OAuth consent screen + Web application OAuth client created (user did this manually — needs their own console access). `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` added to the local, gitignored `.env`. Redirect URI registered: `http://localhost:3000/oauth/callback` (Railway domain callback still to be added post-deploy).
