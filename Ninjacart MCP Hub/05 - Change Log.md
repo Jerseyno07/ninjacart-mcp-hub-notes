@@ -4,6 +4,20 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-14 — Production outage: non-ASCII char in error message crashed the server on every expired token
+
+**Trigger**: user reported other teammates getting errors from `query_packtrack_db`.
+
+**Root cause (found via `railway logs`)**: `tokenVerifier.js`'s expired-token message contained an em dash (`—`) — `'Access token expired — sign in again to get a new one.'`. The SDK's `requireBearerAuth` middleware builds the `WWW-Authenticate` header directly from `InvalidTokenError.message`. Node's header validation only allows ISO-8859-1/ASCII bytes and throws `ERR_INVALID_CHAR` **synchronously, outside any try/catch in our code**, on any non-ASCII character — so the very first person whose hourly access token expired crashed the entire process. Confirmed in the logs: a real crash at `11:33:35`, ~12 minutes of total downtime until Railway auto-restarted at `11:45:59`. Every user's requests during that window failed, not just the one whose token triggered it.
+
+**Fix** (commit `950ac1c`): replaced the em dash with a plain ASCII hyphen. Verified the header value passes Node's `http.validateHeaderValue` before deploying. Deployed and confirmed clean startup with no further crashes.
+
+**Second issue found after the fix deployed**: the user retried and still got an error — a *different*, non-crashing one. `src/server.js`'s `transports` map (live MCP session objects, one per connected client) is in-memory and was wiped by the restart above. The user's Claude client was still holding the pre-crash `mcp-session-id`, which the server no longer recognized, so it got a clean `400 Bad Request: No valid session ID provided` on every request — silently, since that specific response path doesn't call `log()`, which is why nothing showed up in Railway logs even though requests were arriving. **Fix was client-side, not a code change**: disconnecting and reconnecting the MCP server entry in Claude forced a fresh `initialize` handshake with a new session ID. No re-login (Google OAuth) was needed — only the transport-level MCP session was stale, not the access/refresh tokens. Confirmed working afterward via `packtrack_query` log entries from both `vishalb@ninjacart.com` and `umeshjampani@ninjacart.com`.
+
+**Follow-up worth considering**: `transports` being in-memory and tied to process lifetime means *any* server restart (crash, redeploy, Railway platform event) will force every currently-connected client to reconnect once, even though the OAuth session itself survives. This is a real UX cost distinct from the already-tracked refresh-token/redeploy risk — see [[07 - Open Risks]].
+
+---
+
 ## 2026-08-14 — Granted ADMIN access to vishalb@ninjacart.com
 
 Added to `src/auth/roles.js` (commit `84e0974`), same pattern as the other two ADMIN grants earlier today — hand-edited entry, no admin UI at this scale (see [[07 - Open Risks]] #6). Pushed to `main`; Railway auto-deploys.
