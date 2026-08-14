@@ -4,6 +4,12 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-14 — Granted ADMIN access to vishalb@ninjacart.com
+
+Added to `src/auth/roles.js` (commit `84e0974`), same pattern as the other two ADMIN grants earlier today — hand-edited entry, no admin UI at this scale (see [[07 - Open Risks]] #6). Pushed to `main`; Railway auto-deploys.
+
+---
+
 ## 2026-08-14 — mcp_readonly deny-by-default for future tables (packtrack-pro)
 
 **Trigger**: user flagged that the 3 tables added for the hub itself (`oauth_clients`, `refresh_tokens`, `knowledge_chunks`) live in the same Neon DB `query_packtrack_db` queries, and asked whether that's a security risk.
