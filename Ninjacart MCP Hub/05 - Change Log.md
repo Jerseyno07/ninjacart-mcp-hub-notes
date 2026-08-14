@@ -4,6 +4,26 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-14 — Refresh tokens + persistent OAuth state (Open Risks #1 and #4 resolved)
+
+**Trigger**: user reported Claude got disconnected from the MCP hub. Root cause: access tokens expire after 1h with no refresh flow, and all OAuth session state (registered MCP clients, in particular) lived in an in-memory `Map` that any Railway redeploy wiped — so both a normal hour of inactivity *and* a routine deploy each forced a full Google re-login. Went through plan mode given this touches security-critical auth code (`~/.claude/plans/soft-dancing-blum.md`).
+
+- **New `src/auth/db.js`**: `oauth_clients` and `refresh_tokens` tables in the same Neon DB already used for `knowledge_chunks` (`KNOWLEDGE_DATABASE_URL`), same `ensureSchema()`-on-boot pattern as `knowledge/store.js` — no new database, no manual migration step.
+- **Refresh tokens**: opaque (`crypto.randomBytes(48)`, not JWT — revocation needs a DB lookup either way), stored as sha256 hashes only, 90-day sliding TTL, **rotated on every use** (old token revoked, new one issued). Role/projects re-derived live from `getRole()` on every refresh rather than trusted from the old token — a `roles.js` revocation now takes effect on the person's next refresh, not just their next full re-auth.
+- **`POST /token`** now handles `grant_type=refresh_token` alongside the existing `authorization_code` grant; `oauthMetadata.grant_types_supported` advertises it so clients know to use it.
+- **DCR client registration** (`/register`, `/authorize`) moved off the in-memory `registeredClients` Map onto the new `oauth_clients` table — the actual fix for clients vanishing on every redeploy. `pendingAuthorizations`/`authorizationCodes` deliberately stay in-memory (minutes-lived, low-consequence if a redeploy lands mid-login — user just retries).
+- **Verified locally**: full auth-code → refresh → rotated-refresh chain works, old rotated-away refresh tokens correctly rejected, and — the actual point — a refresh token issued before a server **restart** still worked after it.
+- **Verified in production** (commit `26e673f`): full real Google login → token exchange with `refresh_token` in the response → refresh grant → rotation confirmed → **triggered a real Railway redeploy** → the refresh token issued *before* that redeploy successfully got a new access token *after* it. This is the actual proof the fix works, not just a local simulation.
+- **One-time rollout cost**: this deploy itself wiped the previous in-memory client registry, so every already-connected MCP client needed one more fresh reconnect. After that, redeploys should no longer force reconnects, and hourly token expiry becomes invisible (silent refresh).
+
+**Also logged from earlier today, not previously written up**:
+- **Login/error page redesign** (commit `c5207fb`): replaced the bare unstyled HTML in `src/auth/routes.js` with a centered card, brand mark, status icons, and a Google-brand-compliant sign-in button. Verified visually before deploying.
+- **Granted `ADMIN` access** to `umeshjampani@ninjacart.com` and `sayanbhowmik@ninjacart.com` (commit `d33f9b6`) — first deploy attempt failed with no retrievable logs (apparent one-off Railway platform hiccup, not a code issue — the change was a trivial data-only edit); retry succeeded cleanly.
+
+**Status**: Open Risks #1 (in-memory tokenStore) and #4 (no refresh tokens) both resolved — see [[07 - Open Risks]].
+
+---
+
 ## 2026-08-14 — Embeddings switched to Voyage AI, knowledge search live in production
 
 - **Discussed OpenAI vs Voyage AI** with the user: Voyage AI has a 200M-token one-time free grant (vs OpenAI's pay-from-token-one, though both are trivially cheap at this project's scale) and is generally rated better for retrieval — user chose Voyage.

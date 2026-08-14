@@ -15,14 +15,18 @@ The MCP TypeScript SDK's `ProxyOAuthServerProvider` has an open, unresolved bug 
    ```
    Then **role check**: `getRole(payload.email)` from `roles.js` — undefined means real `@ninjacart.com` account but not on the allowlist, rejected the same as a domain failure (see [[03 - Roles & Access]]). On success: one-time broker code → `tokenStore` (email + role + client's PKCE/redirect/state, ~2min TTL) → redirect to client's `redirect_uri`.
 
-3. **`POST /token`** — standard `grant_type=authorization_code` exchange. PKCE check (S256 only). Sign our JWT (`sub=email`, `role`, `projects`, 1h expiry), return `{ access_token, token_type: "Bearer", expires_in: 3600 }`.
+3. **`POST /token`**, `grant_type=authorization_code` — PKCE check (S256 only). Sign our JWT access token (`sub=email`, `role`, `projects`, 1h expiry) **and** issue a refresh token (see below). Returns `{ access_token, refresh_token, token_type: "Bearer", expires_in: 3600 }`.
 
-4. **`POST /register`** — Dynamic Client Registration for MCP clients; public PKCE client, no secret. Only registers *client apps*, not users — real access control is the Google-domain + role check above.
+4. **`POST /token`, `grant_type=refresh_token`** (added 2026-08-14) — client sends its refresh token; we hash it, look it up in Postgres (`src/auth/db.js`), reject if missing/expired/revoked. Role/projects are **re-derived live** via `getRole(email)`, not trusted from the old token — a `roles.js` revocation takes effect on the account's next refresh. Issues a new access token + a **rotated** refresh token (old one immediately revoked). Same response shape as above. This is what lets an MCP client stay connected indefinitely without the user re-clicking "Sign in with Google" every hour.
 
-5. **SDK metadata routes** — `mcpAuthMetadataRouter` exposes `/.well-known/oauth-protected-resource`.
+5. **`POST /register`** — Dynamic Client Registration for MCP clients; public PKCE client, no secret. Registered clients are persisted in Postgres (`oauth_clients` table), not in-memory — survives redeploys. Only registers *client apps*, not users — real access control is the Google-domain + role check above.
 
-## Storage tradeoff
-`tokenStore.js` is an in-memory `Map` + TTL sweep — fine for short TTLs and a single Railway instance. A mid-flow restart drops in-flight logins (user retries); breaks if ever scaled to >1 replica. Keep single-replica, or swap backing store later. Tracked in [[07 - Open Risks]].
+6. **SDK metadata routes** — `mcpAuthMetadataRouter` exposes `/.well-known/oauth-protected-resource`. `oauthMetadata.grant_types_supported` advertises both `authorization_code` and `refresh_token`.
+
+## Storage
+`tokenStore.js`'s in-memory `Map` + TTL sweep is now only used for **minutes-lived, low-consequence** state — pending Google logins (~10min) and one-time authorization codes (~2min). Fine to lose on a restart; user just retries.
+
+**Longer-lived state moved to Postgres on 2026-08-14** (`src/auth/db.js`, same Neon DB as `knowledge_chunks`): registered MCP clients (`oauth_clients`) and refresh tokens (`refresh_tokens`, opaque tokens stored as sha256 hashes, 90-day sliding TTL, rotated on every use). This is what actually fixed the "disconnects on every redeploy" problem — verified end-to-end including surviving a real Railway redeploy, see [[05 - Change Log]]. Still single-Railway-instance-only for the remaining in-memory pieces — tracked in [[07 - Open Risks]].
 
 ## Self-explanatory error copy (exact requirement)
 - 401 JSON: `{ "error": "unauthorized", "error_description": "Access to this MCP server requires signing in with an @ninjacart.com Google account. Start the login flow at: https://<server>/authorize" }`
