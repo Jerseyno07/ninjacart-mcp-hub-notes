@@ -2,6 +2,8 @@
 
 **Live since 2026-08-13** — `https://ninjacart-mcp-hub-production.up.railway.app`, fully verified (real Google login → token → authenticated tool call, see [[05 - Change Log]]).
 
+**MCP connection link (what clients actually connect to)**: `https://ninjacart-mcp-hub-production.up.railway.app/mcp`
+
 New, **separate** Railway project (not a service inside PackTrack Pro's), deployed from `ninjacart-mcp-hub`. Railway CLI (`@railway/cli`, `npm install -g`) was used for the whole setup — project creation, service linked directly to the GitHub repo on `main` (auto-deploys on push, same as PackTrack Pro), env vars, and domain, all via `railway` commands rather than the dashboard.
 
 **Gotcha hit during setup**: the service domain must target the actual port the app binds to — Railway injects its own `PORT` value at container runtime (came out to 8080 here), not necessarily the port guessed when the domain was first created. If `/health` 502s right after a fresh domain, check `railway domain update --port <actual-port>`.

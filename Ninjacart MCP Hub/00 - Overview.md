@@ -1,5 +1,7 @@
 # Ninjacart MCP Hub
 
+**MCP connection link**: `https://ninjacart-mcp-hub-production.up.railway.app/mcp` — add this as a remote MCP server in Claude Desktop/claude.ai (Google sign-in required, see [[03 - Roles & Access]] for who's allowlisted).
+
 A personal/team MCP server that lets you ask plain-English questions and get answers from Ninjacart project data — the way ad-hoc terminal sessions already do it — but as a proper remote MCP server other MCP clients (Claude Desktop, claude.ai connectors) can connect to. Built to grow into a hub for **multiple** projects behind one shared Google login, starting with PackTrack Pro.
 
 ## Why
