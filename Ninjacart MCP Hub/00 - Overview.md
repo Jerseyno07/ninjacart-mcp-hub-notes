@@ -38,3 +38,4 @@ Full build plan: `~/.claude/plans/robust-sparking-music.md` (23-step implementat
 - [[05 - Change Log]]
 - [[06 - Deployment]]
 - [[07 - Open Risks]]
+- [[08 - Updating Context After Schema Changes]]
