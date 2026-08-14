@@ -11,6 +11,7 @@ Carried over verbatim from the build plan so they stay tracked, not buried in a 
 7. **No row-level scoping within a project** — a role gates *which projects'* tools someone can call, not *which rows* of data they see. The free-form SQL tool can return any non-`users`/`sessions` row to anyone with `packtrack` in their `projects` list. Acceptable while everyone granted access should see all operational data; needs real Postgres RLS before onboarding roles below `ADMIN`.
 8. **Knowledge base staleness** — `notes/` and `knowledge_chunks` only reflect reality as of the last manual `ingest.js` run, no auto re-index. Consider a pre-deploy hook later.
 9. **`pgvector` availability on Neon** — verify the extension is enabled on the current plan before committing to it; fall back to `sqlite-vec` alongside the app if unavailable.
+10. ~~**`mcp_readonly` grant-all-by-default policy** exposed the hub's own tables to `query_packtrack_db`~~ — **Resolved 2026-08-14**: user asked whether the hub's own new tables (`oauth_clients`, `refresh_tokens`, `knowledge_chunks`) were reachable via the read-only SQL tool. They weren't at the time (migration `025` had already patched them, just never logged here), but the policy behind it — `024`'s `ALTER DEFAULT PRIVILEGES` auto-granting `SELECT` on every future table — meant any *new* table would be silently exposed again with nothing to catch it. `packtrack-pro` migration `026` flipped the default to deny-by-default; existing grants unaffected, verified live. See [[05 - Change Log]].
 
 ## Related Notes
 - [[00 - Overview]]

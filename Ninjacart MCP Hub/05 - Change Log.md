@@ -4,6 +4,20 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-14 — mcp_readonly deny-by-default for future tables (packtrack-pro)
+
+**Trigger**: user flagged that the 3 tables added for the hub itself (`oauth_clients`, `refresh_tokens`, `knowledge_chunks`) live in the same Neon DB `query_packtrack_db` queries, and asked whether that's a security risk.
+
+**Investigation**: connected directly to the live DB with the `mcp_readonly` credentials. Current state was actually safe — `025_mcp_readonly_exclude_hub_tables.sql` had already been applied and all three tables returned `permission denied`, even though (unlike `024`) that fact was never logged here. But the underlying policy was still grant-all-then-revoke: `024`'s `ALTER DEFAULT PRIVILEGES` auto-grants `SELECT` to `mcp_readonly` on every table the owner role creates from then on, and `025` only patched the three tables that existed *at the time it ran*. Any table created after `025` would have been silently exposed again, with nothing to catch it.
+
+**Fix** (`packtrack-pro` migration `026_mcp_readonly_deny_future_tables.sql`, commit `1926c5e`): flipped the default from grant-all to deny-by-default (`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM mcp_readonly`). Existing table grants (PackTrack Pro's own business tables) are untouched — this only changes what happens for tables created going forward. Any new PackTrack Pro table that should be queryable via `query_packtrack_db` now needs an explicit follow-up `GRANT SELECT`, same as any other deliberate access decision.
+
+**Verified live**: created a throwaway table as the owner role, confirmed `mcp_readonly` got `permission denied` on it by default (old behavior would have allowed it), then confirmed `materials` (an existing table) is still readable and unaffected. Applied directly against Neon and pushed to `packtrack-pro` `main`.
+
+**Status**: closes the structural gap behind [[07 - Open Risks]] items already marked resolved for #1/#4 — this is a new, separate finding, not a reopening of those.
+
+---
+
 ## 2026-08-14 — Refresh tokens + persistent OAuth state (Open Risks #1 and #4 resolved)
 
 **Trigger**: user reported Claude got disconnected from the MCP hub. Root cause: access tokens expire after 1h with no refresh flow, and all OAuth session state (registered MCP clients, in particular) lived in an in-memory `Map` that any Railway redeploy wiped — so both a normal hour of inactivity *and* a routine deploy each forced a full Google re-login. Went through plan mode given this touches security-critical auth code (`~/.claude/plans/soft-dancing-blum.md`).
