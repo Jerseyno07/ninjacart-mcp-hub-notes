@@ -4,6 +4,24 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-25 — Knowledge base re-indexed: Flash SKU-GRN blocker + Transit Difference report
+
+**Trigger**: user asked to re-index new PackTrack Pro additions into the knowledge base. Checked `src/projects/packtrack/notes/` first — no new/changed files there, so checked PackTrack Pro's own Obsidian vault (`~/Documents/ninjacart`) and change log for what had actually shipped since the hub's notes were last written (2026-08-13).
+
+**Found two real, shipped features not yet covered**:
+- **Flash SKU-GRN blocker** (push model, entries 95-99 in PackTrack Pro's change log, Aug 20-21) — PackTrack notifies Flash when a facility's receiving fully clears, so Flash can locally gate SKU-GRN instead of calling PackTrack synchronously on every attempt.
+- **Transit Difference report** (entry 101, Aug 25) — new Admin Panel tab surfacing dispatches that closed with a gap between issued and accounted-for quantity.
+
+Deliberately did **not** add the "PO Creation & Vendor Payments" plan (entry 98) — that's planning only, nothing implemented yet, and the knowledge base should reflect current reality, not roadmap ideas.
+
+**New notes** (`flash-sku-grn-blocker.md`, `transit-difference-report.md`, commit `c067d4a`): written from the actual plan docs and change log entries, including honest caveats — the Flash integration's outbound env vars aren't set in Railway yet (so it's currently a no-op in production) and there's no call yet to re-block a facility after a new dispatch arrives.
+
+**Ingested**: `node src/knowledge/ingest.js --project packtrack` — 25 chunks total across all 6 files (4 existing + 2 new), hit and recovered from Voyage's free-tier rate limit mid-run as expected. Verified with two direct semantic-search sanity checks — "does the flash integration block GRN if packaging material is still in transit" and "what counts as a transit difference for dispatches" both correctly top-matched their own new note (scores 0.695 and 0.496).
+
+**Why the re-ingest matters**: `search_packtrack_knowledge` only reflects whatever was last embedded — see [[08 - Updating Context After Schema Changes]]. Without this, questions about either new feature would have returned "no relevant notes found" or, worse, stale/incomplete context.
+
+---
+
 ## 2026-08-14 — Production outage: non-ASCII char in error message crashed the server on every expired token
 
 **Trigger**: user reported other teammates getting errors from `query_packtrack_db`.
