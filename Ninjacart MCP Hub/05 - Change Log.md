@@ -4,6 +4,12 @@ Newest entries at the top. Each entry: what changed, why, commit hash(es).
 
 ---
 
+## 2026-08-25 — Granted ADMIN access to venkateshan.d@ninjacart.com
+
+Added to `src/auth/roles.js` (commit `492cb65`), same pattern as the other ADMIN grants — hand-edited entry, no admin UI at this scale (see [[07 - Open Risks]] #6). Pushed to `main`; Railway auto-deploys.
+
+---
+
 ## 2026-08-25 — Knowledge base re-indexed: Flash SKU-GRN blocker + Transit Difference report
 
 **Trigger**: user asked to re-index new PackTrack Pro additions into the knowledge base. Checked `src/projects/packtrack/notes/` first — no new/changed files there, so checked PackTrack Pro's own Obsidian vault (`~/Documents/ninjacart`) and change log for what had actually shipped since the hub's notes were last written (2026-08-13).
