@@ -2,3 +2,11 @@
 .obsidian/workspace-mobile.json
 .trash/
 .DS_Store
+
+# Local-only detailed engineering notes — not for the public repo (see
+# Overview.md's note on this). Rebuilt 2026-09-16 after the 08-28 strip-down.
+Ninjacart MCP Hub/01 - Architecture.md
+Ninjacart MCP Hub/02 - Auth & OAuth Flow.md
+Ninjacart MCP Hub/03 - Roles & Access.md
+Ninjacart MCP Hub/06 - Deployment.md
+Ninjacart MCP Hub/07 - Open Risks.md
